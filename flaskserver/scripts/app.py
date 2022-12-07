@@ -13,14 +13,14 @@ from flask import Flask, request, send_from_directory, make_response, jsonify
 from flask_cors import CORS
 
 gmaps_key = os.environ.get('GMAPS_API_KEY', '')
-gmaps = googlemaps.Client(key=gmaps_key)
+gmaps = googlemaps.Client(key=gmaps_key) if gmaps_key != '' else None
 
 mongo_user = os.environ.get('MONGO_USER', '')
 mongo_password = os.environ.get('MONGO_PASSWORD', '')
 mongo_host = os.environ.get('MONGO_HOST', '')
-mongo_port = os.environ.get('MONGO_PASSWORD', '')
+mongo_port = os.environ.get('MONGO_PORT', '')
 client = pymongo.MongoClient(f'mongodb://{mongo_user}:{mongo_password}@{mongo_host}:{mongo_port}')
-db = client.database
+db = client.scheduler
 
 app = Flask(__name__)
 CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
