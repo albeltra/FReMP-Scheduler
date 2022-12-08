@@ -22,7 +22,7 @@ mongo_port = os.environ.get('MONGO_PORT', '')
 
 def mongo(user, password, host=mongo_host, port=mongo_port):
     client = pymongo.MongoClient(f'mongodb://{user}:{password}@{host}:{port}')
-    return client.scheduler
+    return client
 
 
 if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
@@ -68,7 +68,9 @@ def login():
         if db is None:
             try:
                 if user and password:
-                    db = mongo(user, password)
+                    client = mongo(user, password)
+                    client.server_info()
+                    db = client.scheduler
             except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
