@@ -19,12 +19,22 @@ mongo_user = os.environ.get('MONGO_USER', '')
 mongo_password = os.environ.get('MONGO_PASSWORD', '')
 mongo_host = os.environ.get('MONGO_HOST', '')
 mongo_port = os.environ.get('MONGO_PORT', '')
-client = pymongo.MongoClient(f'mongodb://{mongo_user}:{mongo_password}@{mongo_host}:{mongo_port}')
-db = client.scheduler
+
+
+def mongo(user, password, host=mongo_host, port=mongo_port):
+    client = pymongo.MongoClient(f'mongodb://{user}:{password}@{host}:{port}')
+    return client.scheduler
+
+
+if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
+    db = mongo(mongo_user, mongo_password)
+else:
+    db = None
 
 app = Flask(__name__)
 CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '')
+
 
 def token_required(f):
     @wraps(f)
@@ -50,10 +60,14 @@ def token_required(f):
 @app.route('/flask/login', methods=['POST'])
 def upload_file():
     if request.method == 'POST':
-        print(request.form) 
         user = request.form.get("user")
         password = request.form.get("password")
-
+        global db
+        if db is None:
+            try:
+                db = mongo(user, password)
+            except: 
+                return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
         return make_response(jsonify({'token': token}), 201)
 
