@@ -58,12 +58,13 @@ def token_required(f):
 
 
 @app.route('/flask/login', methods=['POST'])
-def upload_file():
+def login():
     if request.method == 'POST':
-        user = request.form.get("user")
+        user = request.form.get("username")
         password = request.form.get("password")
         print(request.form)
-        global db 
+        print(user, password) 
+        global db
         if db is None:
             try:
                 db = mongo(user, password)
