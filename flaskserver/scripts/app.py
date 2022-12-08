@@ -29,7 +29,6 @@ if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
     db = mongo(mongo_user, mongo_password)
 else:
     db = None
-print(db)
 
 app = Flask(__name__)
 CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
@@ -61,6 +60,8 @@ def token_required(f):
 def login():
     if request.method == 'POST':
         data = json.loads(request.data)
+        print(request.data)
+        print(data)
         user = data.get("username")
         password = data.get("password")
         global db
