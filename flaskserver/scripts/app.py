@@ -62,11 +62,13 @@ def upload_file():
     if request.method == 'POST':
         user = request.form.get("user")
         password = request.form.get("password")
-        global db
+        print(request.form)
+        global db 
         if db is None:
             try:
                 db = mongo(user, password)
-            except: 
+                print(db)
+            except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
         return make_response(jsonify({'token': token}), 201)
