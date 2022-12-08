@@ -66,12 +66,12 @@ def login():
         password = data.get("password")
         global db
         if db is None:
-            try:
-                if user and password:
-                    client = mongo(user, password)
-                    client.server_info()
-                    db = client.scheduler
-            except:
+            # try:
+            if user and password:
+                client = mongo(user, password)
+                client.server_info()
+                db = client.scheduler
+            # except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
         return make_response(jsonify({'token': token}), 201)
