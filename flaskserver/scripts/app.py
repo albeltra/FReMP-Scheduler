@@ -68,7 +68,8 @@ def login():
         global db
         if db is None:
             try:
-                db = mongo(user, password)
+                if user and password:
+                    db = mongo(user, password)
             except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
