@@ -73,7 +73,7 @@ def login():
             except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
-        return make_response(jsonify({'token': token}), 201)
+        return make_response(jsonify({'flask_token': token}), 201)
 
 
 @app.route("/flask/invoices/<path:name>")
