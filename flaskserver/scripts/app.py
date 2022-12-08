@@ -32,9 +32,7 @@ else:
 print(db)
 
 app = Flask(__name__)
-CORS(app)
-print(os.environ.get('FLASK_DOMAIN', '*'))
-# CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
+CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '')
 
 
