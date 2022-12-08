@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import unquote
-
 import googlemaps
 import jwt
 import pymongo
@@ -30,10 +29,12 @@ if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
     db = mongo(mongo_user, mongo_password)
 else:
     db = None
-print(db) 
+print(db)
 
 app = Flask(__name__)
-CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
+CORS(app)
+print(os.environ.get('FLASK_DOMAIN', '*'))
+# CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '')
 
 
@@ -61,15 +62,13 @@ def token_required(f):
 @app.route('/flask/login', methods=['POST'])
 def login():
     if request.method == 'POST':
-        user = request.form.get("username")
-        password = request.form.get("password")
-        print(request.form)
-        print(user, password)
+        data = json.loads(request.data)
+        user = data.get("username")
+        password = data.get("password")
         global db
         if db is None:
             try:
                 db = mongo(user, password)
-                print(db)
             except:
                 return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
