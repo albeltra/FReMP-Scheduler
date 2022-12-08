@@ -50,9 +50,9 @@ def token_required(f):
 @app.route('/flask/login', methods=['POST'])
 def upload_file():
     if request.method == 'POST':
-        print(request.body)
-        user = request.body.get("user")
-        password = request.body.get("password")
+        print(request.form) 
+        user = request.form.get("user")
+        password = request.form.get("password")
 
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
         return make_response(jsonify({'token': token}), 201)
