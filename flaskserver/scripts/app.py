@@ -30,6 +30,7 @@ if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
     db = mongo(mongo_user, mongo_password)
 else:
     db = None
+print(db) 
 
 app = Flask(__name__)
 CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
@@ -63,7 +64,7 @@ def login():
         user = request.form.get("username")
         password = request.form.get("password")
         print(request.form)
-        print(user, password) 
+        print(user, password)
         global db
         if db is None:
             try:
