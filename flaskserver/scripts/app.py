@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import unquote
+
 import googlemaps
 import jwt
 import pymongo
@@ -26,7 +27,7 @@ def mongo(user, password, host=mongo_host, port=mongo_port):
 
 
 if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
-    db = mongo(mongo_user, mongo_password)
+    db = mongo(mongo_user, mongo_password).database
 else:
     db = None
 
@@ -70,8 +71,9 @@ def login():
                 if user and password:
                     client = mongo(user, password)
                     client.server_info()
+                    db = client.database
             except:
-                return make_response(jsonify({"message": "Invalid Login"}), 401) 
+                return make_response(jsonify({"message": "Invalid Login"}), 401)
         token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
         return make_response(jsonify({'token': token}), 201)
 
