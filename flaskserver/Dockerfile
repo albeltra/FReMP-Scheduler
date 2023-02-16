@@ -18,4 +18,4 @@ COPY ./scripts /scripts
 
 WORKDIR /scripts
 
-ENTRYPOINT ["gunicorn", "--chdir", "/scripts", "app:app"]
+ENTRYPOINT ["gunicorn", "-b", "0.0.0.0",  "--chdir", "/scripts", "app:app"]
