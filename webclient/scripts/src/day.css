@@ -1,0 +1,4 @@
+.your-select option:checked {
+    /* color:rgb(255, 0, 0); */
+    font-size: large;
+}
