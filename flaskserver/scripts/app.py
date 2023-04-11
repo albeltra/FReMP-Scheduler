@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from functools import wraps
+import subprocess
 from urllib.parse import unquote
 
 import googlemaps
@@ -12,11 +13,11 @@ from bson import json_util
 from flask import Flask, request, send_from_directory, make_response, jsonify
 from flask_cors import CORS
 
+from invoice_n import make_invoice
+
 gmaps_key = os.environ.get('GMAPS_API_KEY', '')
 gmaps = googlemaps.Client(key=gmaps_key) if gmaps_key != '' else None
 
-mongo_user = os.environ.get('MONGO_USER', '')
-mongo_password = os.environ.get('MONGO_PASSWORD', '')
 mongo_host = os.environ.get('MONGO_HOST', '')
 mongo_port = os.environ.get('MONGO_PORT', '')
 
@@ -25,11 +26,6 @@ def mongo(user, password, host=mongo_host, port=mongo_port):
     client = pymongo.MongoClient(f'mongodb://{user}:{password}@{host}:{port}')
     return client
 
-
-if all([x != '' for x in [mongo_user, mongo_password, mongo_host, mongo_port]]):
-    db = mongo(mongo_user, mongo_password).database
-else:
-    db = None
 
 app = Flask(__name__)
 CORS(app, resources={r"/flask/*": {"origins": os.environ.get('FLASK_DOMAIN', '*')}})
@@ -45,14 +41,15 @@ def token_required(f):
             token = request.headers['x-access-token']
         if not token:  # throw error if no token provided
             return make_response(jsonify({"message": "A valid token is missing!"}), 401)
-        try:
-            # decode the token to obtain user public_id
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        # try:
+        # decode the token to obtain user db
+        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
 
-        except:
-            return make_response(jsonify({"message": "Invalid token!"}), 401)
+        # except:
+        #     return make_response(jsonify({"message": "Invalid token!"}), 402)
         # Return the user information attached to the token
-        return f(data, *args, **kwargs)
+        db = mongo(data["user"], data["password"], host=mongo_host, port=mongo_port)
+        return f(db.database, *args, **kwargs)
 
     return decorator
 
@@ -61,26 +58,23 @@ def token_required(f):
 def login():
     if request.method == 'POST':
         data = json.loads(request.data)
-        print(request.data)
-        print(data)
         user = data.get("username")
         password = data.get("password")
-        global db
-        if db is None:
+        if user and password:
             try:
-                if user and password:
-                    client = mongo(user, password)
-                    client.server_info()
-                    db = client.database
+                client = mongo(user, password)
+                client.server_info()
+                db = client.database
+                token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
+                return make_response(jsonify({'token': token}), 201)
             except:
-                return make_response(jsonify({"message": "Invalid Login"}), 401)
-        token = jwt.encode({'user': user, 'password': password}, app.config['SECRET_KEY'], 'HS256')
-        return make_response(jsonify({'token': token}), 201)
+                pass
+        return make_response(jsonify({"message": "Invalid Login"}), 401)
 
 
 @app.route("/flask/invoices/<path:name>")
 @token_required
-def download_file(public_id, name):
+def download_file(db, name):
     if os.path.isfile('/invoices/' + name):
         return send_from_directory(
             '/invoices/', name, as_attachment=True
@@ -89,29 +83,23 @@ def download_file(public_id, name):
         return send_from_directory(
             '/invoices/', name.replace(' .pdf', '.pdf'), as_attachment=True)
     else:
-        N = name.split(' ')[1]
-        command = f"python3 /scripts/invoice_n.py -N {N}"
-        os.system(command)
-        return send_from_directory(
-            '/invoices/', name, as_attachment=True
-        )
+        n = name.split(' ')[1]
+        make_invoice(['-N', str(n)])
+        return send_from_directory('/invoices/', name, as_attachment=True)
 
 
 @app.route("/flask/recreate/<path:name>")
 @token_required
-def recreate_file(public_id, name):
+def recreate_file(db, name):
     print(name)
-    N = name.split(' ')[1]
-    command = f"python3 /scripts/invoice_n.py -N {N}"
-    os.system(command)
-    return send_from_directory(
-        '/invoices/', name, as_attachment=True
-    )
+    n = name.split(' ')[1]
+    make_invoice(['-N', str(n)])
+    return send_from_directory('/invoices/', name, as_attachment=True)
 
 
 @app.route("/flask/weekend", methods=['GET'])
 @token_required
-def weekend(public_id):
+def weekend(db):
     if request.method == 'GET':
         today = datetime.today()
         date1 = today + timedelta(days=4 - today.weekday())
@@ -120,8 +108,33 @@ def weekend(public_id):
         return json_util.dumps({"data": out}), 200
 
 
+@app.route("/flask/day/<day>", methods=['GET'])
+@token_required
+def date(db, day):
+    if request.method == 'GET':
+        out = list(db.Recent.find({"Date": {"$eq": day}}).sort("ISODate", pymongo.ASCENDING))
+        for cur_record in out:
+            cur_record["_id"] = str(cur_record["_id"])
+        return json_util.dumps({"data": out}), 200
+
+
+@app.route("/flask/record/<ID>", methods=['GET'])
+@app.route("/flask/record", methods=['GET'])
+@token_required
+def record(db, ID=None):
+    if request.method == 'GET':
+        if ID is not None:
+            out = list(db.Recent.find({"_id": ObjectId(ID)}))
+        else:
+            out = list(db.Recent.find({}))
+        for cur_record in out:
+            cur_record["_id"] = str(cur_record["_id"])
+        return json_util.dumps({"data": out}), 200
+
+
 @app.route("/flask/history/<field>", methods=['GET'])
-def get_field(field):
+@token_required
+def get_field(db, field):
     if request.method == 'GET':
         out = list(db.Historical.find({unquote(field): {"$exists": True}}).sort("ISODate", pymongo.DESCENDING).limit(4))
         return json_util.dumps({"data": out}), 200
@@ -129,7 +142,7 @@ def get_field(field):
 
 @app.route("/flask/update/<ID>", methods=['POST'])
 @token_required
-def update_record(public_id, ID):
+def update_record(db, ID):
     if request.method == 'POST':
         record = json.loads(request.data)
         filtered = {k: v for k, v in record.items() if v}
@@ -142,13 +155,21 @@ def update_record(public_id, ID):
                 record['DNB'] = ""
         db.Recent.update_one({'_id': ObjectId(ID)}, {"$set": filtered})
         db.Recent.update_one({'_id': ObjectId(ID)}, {"$unset": {k: v for k, v in record.items() if not v}})
-        print(filtered)
+        return 'Success', 200
+
+
+@app.route("/flask/delete/<ID>", methods=['POST'])
+@token_required
+def delete_record(db, ID):
+    print(ID)
+    if request.method == 'POST':
+        db.Recent.delete_one({'_id': ObjectId(ID)})
         return 'Success', 200
 
 
 @app.route("/flask/add", methods=['POST'])
 @token_required
-def add_record(public_id):
+def add_record(db):
     if request.method == 'POST':
         record = json.loads(request.data)
         if record['Date']:
@@ -186,9 +207,8 @@ def add_record(public_id):
 
 @app.route("/flask/distinct", methods=['GET'])
 @token_required
-def distinct(public_id):
+def distinct(db):
     if request.method == 'GET':
-        print(request.args)
         key = request.args.get("key")
         if key is not None:
             output = db.Recent.distinct(key)
